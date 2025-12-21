@@ -1,0 +1,4 @@
+project_id = "cjcsdxkcwydsjcoqnrrf"
+
+[functions.predict-asl]
+verify_jwt = false
