@@ -43,7 +43,7 @@ export function useAIRecognition(): UseAIRecognitionReturn {
 
     try {
       const { data, error: fnError } = await supabase.functions.invoke('predict-asl', {
-        body: { image: imageData }
+        body: { imageData }
       });
 
       if (fnError) {
