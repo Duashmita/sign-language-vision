@@ -3,6 +3,8 @@ import { Hands, Results } from '@mediapipe/hands';
 import { GestureEstimator } from 'fingerpose';
 import { aslGestures } from '@/lib/aslGestures';
 
+const MEDIAPIPE_HANDS_VERSION = '0.4.1675469240';
+
 export interface PredictionResult {
   letter: string;
   confidence: number;
@@ -31,6 +33,7 @@ export function useASLRecognition(): UseASLRecognitionReturn {
   const gestureEstimatorRef = useRef<GestureEstimator | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const isProcessingRef = useRef(false);
 
   // Initialize gesture estimator
   useEffect(() => {
@@ -40,11 +43,32 @@ export function useASLRecognition(): UseASLRecognitionReturn {
   const processFrame = useCallback(async () => {
     if (!videoRef.current || !handsRef.current || !isRunning) return;
 
+    // Defensive: avoid re-entrancy / concurrent WASM calls
+    if (isProcessingRef.current) {
+      animationFrameRef.current = requestAnimationFrame(processFrame);
+      return;
+    }
+
+    isProcessingRef.current = true;
+
     try {
       await handsRef.current.send({ image: videoRef.current });
     } catch (err) {
       console.error('Error processing frame:', err);
+      // Stop the loop on fatal WASM errors to prevent a crash loop.
+      setError('Hand tracking crashed. Please stop and start again.');
+      setIsRunning(false);
+      try {
+        handsRef.current?.close();
+      } catch {
+        // ignore
+      }
+      handsRef.current = null;
+      isProcessingRef.current = false;
+      return;
     }
+
+    isProcessingRef.current = false;
 
     if (isRunning) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
@@ -98,7 +122,8 @@ export function useASLRecognition(): UseASLRecognitionReturn {
       // Initialize MediaPipe Hands
       const hands = new Hands({
         locateFile: (file) => {
-          return `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`;
+          // Pin the CDN asset version to match the installed @mediapipe/hands package.
+          return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${MEDIAPIPE_HANDS_VERSION}/${file}`;
         },
       });
 

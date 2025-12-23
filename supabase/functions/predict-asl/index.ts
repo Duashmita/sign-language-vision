@@ -41,16 +41,28 @@ serve(async (req) => {
     }
 
     console.log('Sending image to model API:', MODEL_API_URL);
-    
-    // Call Hugging Face model API with authentication
-    const response = await fetch(MODEL_API_URL, {
+
+    // Hugging Face endpoints expect an `inputs` key. For images, pass base64 without the data URL prefix.
+    const inputs = typeof imageData === 'string'
+      ? imageData.replace(/^data:image\/\w+;base64,/, '')
+      : imageData;
+
+    const makeRequest = () => fetch(MODEL_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${HUGGINGFACE_API_KEY}`,
       },
-      body: JSON.stringify({ image: imageData }),
+      body: JSON.stringify({ inputs }),
     });
+
+    // Some endpoints may be cold-starting; retry once on 503.
+    let response = await makeRequest();
+    if (response.status === 503) {
+      console.warn('Model API returned 503; retrying once after 1s');
+      await new Promise((r) => setTimeout(r, 1000));
+      response = await makeRequest();
+    }
 
     if (!response.ok) {
       const errorText = await response.text();
