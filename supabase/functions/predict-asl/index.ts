@@ -22,6 +22,7 @@ serve(async (req) => {
     }
 
     const MODEL_API_URL = Deno.env.get('ASL_MODEL_API_URL');
+    const HUGGINGFACE_API_KEY = Deno.env.get('HUGGINGFACE_API_KEY');
     
     if (!MODEL_API_URL) {
       console.error('ASL_MODEL_API_URL is not configured');
@@ -31,13 +32,22 @@ serve(async (req) => {
       );
     }
 
+    if (!HUGGINGFACE_API_KEY) {
+      console.error('HUGGINGFACE_API_KEY is not configured');
+      return new Response(
+        JSON.stringify({ error: 'Hugging Face API key not configured' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     console.log('Sending image to model API:', MODEL_API_URL);
     
-    // Call your Python model API
+    // Call Hugging Face model API with authentication
     const response = await fetch(MODEL_API_URL, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${HUGGINGFACE_API_KEY}`,
       },
       body: JSON.stringify({ image: imageData }),
     });
