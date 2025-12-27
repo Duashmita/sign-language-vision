@@ -118,17 +118,18 @@ export function CompactCamera({
 
   if (hasPermission === false) {
     return (
-      <div className="w-full aspect-video rounded-lg bg-card border border-border flex items-center justify-center">
-        <div className="text-center p-4">
-          <CameraOff className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
-          <p className="text-sm text-muted-foreground">Camera denied</p>
+      <div className="w-full aspect-video rounded-2xl bg-secondary flex items-center justify-center">
+        <div className="text-center p-6">
+          <CameraOff className="w-10 h-10 mx-auto mb-3 text-muted-foreground" />
+          <p className="text-sm font-medium text-muted-foreground">Camera access denied</p>
+          <p className="text-xs text-muted-foreground mt-1">Please allow camera access to continue</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="relative w-full aspect-video rounded-lg overflow-hidden bg-card border border-border">
+    <div className="relative w-full aspect-video rounded-2xl overflow-hidden bg-secondary">
       <video
         ref={videoRef}
         autoPlay
@@ -148,21 +149,21 @@ export function CompactCamera({
       )}
 
       {isActive && handDetected !== undefined && (
-        <div className={`absolute top-2 left-2 flex items-center gap-1.5 px-2 py-1 rounded-full text-xs font-medium ${
+        <div className={`absolute top-3 left-3 flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-semibold backdrop-blur-sm ${
           handDetected 
-            ? 'bg-primary/20 text-primary border border-primary/30' 
-            : 'bg-muted/50 text-muted-foreground border border-border'
+            ? 'bg-accent/90 text-accent-foreground' 
+            : 'bg-card/80 text-muted-foreground border border-border'
         }`}>
-          <div className={`w-1.5 h-1.5 rounded-full ${handDetected ? 'bg-primary' : 'bg-muted-foreground'}`} />
-          {handDetected ? 'Hand' : 'No hand'}
+          <div className={`w-2 h-2 rounded-full ${handDetected ? 'bg-accent-foreground animate-pulse' : 'bg-muted-foreground'}`} />
+          {handDetected ? 'Hand Detected' : 'No Hand'}
         </div>
       )}
 
       {!isActive && (
-        <div className="absolute inset-0 flex items-center justify-center bg-card">
-          <Button variant="ghost" size="sm" onClick={onToggle} className="gap-2">
-            <CameraIcon className="w-4 h-4" />
-            Start
+        <div className="absolute inset-0 flex items-center justify-center bg-secondary">
+          <Button variant="secondary" size="lg" onClick={onToggle} className="gap-2 rounded-xl">
+            <CameraIcon className="w-5 h-5" />
+            Start Camera
           </Button>
         </div>
       )}

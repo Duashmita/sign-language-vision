@@ -57,7 +57,7 @@ export function CaptureTimer({ intervalMs, isActive, onCapture }: CaptureTimerPr
           cy={size / 2}
           r={radius}
           fill="none"
-          stroke="hsl(var(--muted))"
+          stroke="hsl(var(--border))"
           strokeWidth={strokeWidth}
         />
         {/* Progress circle */}
@@ -75,7 +75,7 @@ export function CaptureTimer({ intervalMs, isActive, onCapture }: CaptureTimerPr
         />
       </svg>
       {/* Countdown text */}
-      <span className="absolute text-xs font-medium text-primary">
+      <span className="absolute text-xs font-bold text-primary">
         {secondsLeft}s
       </span>
     </div>
