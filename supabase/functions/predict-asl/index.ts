@@ -56,11 +56,15 @@ serve(async (req) => {
       body: JSON.stringify({ inputs }),
     });
 
-    // Some endpoints may be cold-starting; retry once on 503.
+    // Inference Endpoints can take 30-60s to wake from cold start. Retry with backoff.
     let response = await makeRequest();
-    if (response.status === 503) {
-      console.warn('Model API returned 503; retrying once after 1s');
-      await new Promise((r) => setTimeout(r, 1000));
+    let retries = 0;
+    const maxRetries = 5;
+    while (response.status === 503 && retries < maxRetries) {
+      retries++;
+      const waitSec = retries * 3; // 3s, 6s, 9s, 12s, 15s
+      console.warn(`Model API returned 503; retry ${retries}/${maxRetries} after ${waitSec}s`);
+      await new Promise((r) => setTimeout(r, waitSec * 1000));
       response = await makeRequest();
     }
 
