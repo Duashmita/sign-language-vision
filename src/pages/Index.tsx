@@ -1,10 +1,13 @@
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef } from 'react';
 import { Hand, Play, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CompactCamera } from '@/components/CompactCamera';
 import { CompactPrediction } from '@/components/CompactPrediction';
+import { CaptureTimer } from '@/components/CaptureTimer';
 import { useASLRecognition } from '@/hooks/useASLRecognition';
 import { useAIRecognition } from '@/hooks/useAIRecognition';
+
+const CAPTURE_INTERVAL_MS = 10_000;
 
 const Index = () => {
   const [isActive, setIsActive] = useState(false);
@@ -104,9 +107,12 @@ const Index = () => {
 
           {/* AI Model Method */}
           <div className="space-y-3">
-            <h2 className="text-sm font-medium text-center text-muted-foreground">
-              AI Model (Every 10s when hand detected)
-            </h2>
+            <div className="flex items-center justify-center gap-2">
+              <h2 className="text-sm font-medium text-muted-foreground">
+                AI Model
+              </h2>
+              <CaptureTimer intervalMs={CAPTURE_INTERVAL_MS} isActive={isActive && ai.handDetected} />
+            </div>
             <CompactPrediction
               prediction={ai.prediction}
               isLoading={ai.isLoading}
