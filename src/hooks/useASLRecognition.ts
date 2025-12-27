@@ -34,6 +34,7 @@ export function useASLRecognition(): UseASLRecognitionReturn {
   const animationFrameRef = useRef<number | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const isProcessingRef = useRef(false);
+  const isRunningRef = useRef(false);
 
   // Initialize gesture estimator
   useEffect(() => {
@@ -41,7 +42,7 @@ export function useASLRecognition(): UseASLRecognitionReturn {
   }, []);
 
   const processFrame = useCallback(async () => {
-    if (!videoRef.current || !handsRef.current || !isRunning) return;
+    if (!videoRef.current || !handsRef.current || !isRunningRef.current) return;
 
     // Defensive: avoid re-entrancy / concurrent WASM calls
     if (isProcessingRef.current) {
@@ -57,6 +58,7 @@ export function useASLRecognition(): UseASLRecognitionReturn {
       console.error('Error processing frame:', err);
       // Stop the loop on fatal WASM errors to prevent a crash loop.
       setError('Hand tracking crashed. Please stop and start again.');
+      isRunningRef.current = false;
       setIsRunning(false);
       try {
         handsRef.current?.close();
@@ -65,15 +67,16 @@ export function useASLRecognition(): UseASLRecognitionReturn {
       }
       handsRef.current = null;
       isProcessingRef.current = false;
+      animationFrameRef.current = null;
       return;
     }
 
     isProcessingRef.current = false;
 
-    if (isRunning) {
+    if (isRunningRef.current) {
       animationFrameRef.current = requestAnimationFrame(processFrame);
     }
-  }, [isRunning]);
+  }, []);
 
   const handleResults = useCallback((results: Results) => {
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -114,6 +117,20 @@ export function useASLRecognition(): UseASLRecognitionReturn {
   }, []);
 
   const startRecognition = useCallback(async (videoElement: HTMLVideoElement) => {
+    // Avoid re-initializing MediaPipe if we already have an instance.
+    // (Repeated initialization causes camera/video refresh loops and breaks tracking.)
+    if (handsRef.current) {
+      videoRef.current = videoElement;
+      setIsLoading(false);
+      setError(null);
+      isRunningRef.current = true;
+      setIsRunning(true);
+      if (!animationFrameRef.current) {
+        animationFrameRef.current = requestAnimationFrame(processFrame);
+      }
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
     videoRef.current = videoElement;
@@ -140,6 +157,7 @@ export function useASLRecognition(): UseASLRecognitionReturn {
       handsRef.current = hands;
 
       setIsLoading(false);
+      isRunningRef.current = true;
       setIsRunning(true);
 
       // Start processing frames
@@ -148,12 +166,15 @@ export function useASLRecognition(): UseASLRecognitionReturn {
       console.error('Failed to initialize:', err);
       setError('Failed to initialize hand detection');
       setIsLoading(false);
+      isRunningRef.current = false;
+      setIsRunning(false);
     }
   }, [handleResults, processFrame]);
 
   const stopRecognition = useCallback(() => {
+    isRunningRef.current = false;
     setIsRunning(false);
-    
+
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
       animationFrameRef.current = null;
@@ -163,6 +184,8 @@ export function useASLRecognition(): UseASLRecognitionReturn {
       handsRef.current.close();
       handsRef.current = null;
     }
+
+    isProcessingRef.current = false;
 
     setPrediction(null);
     setHandDetected(false);
@@ -175,13 +198,6 @@ export function useASLRecognition(): UseASLRecognitionReturn {
       stopRecognition();
     };
   }, [stopRecognition]);
-
-  // Start frame processing when running changes
-  useEffect(() => {
-    if (isRunning && !animationFrameRef.current) {
-      animationFrameRef.current = requestAnimationFrame(processFrame);
-    }
-  }, [isRunning, processFrame]);
 
   return {
     isLoading,

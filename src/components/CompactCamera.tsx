@@ -24,6 +24,12 @@ export function CompactCamera({
   const streamRef = useRef<MediaStream | null>(null);
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
 
+  // Keep callback stable so camera doesn't restart on every render
+  const onVideoReadyRef = useRef(onVideoReady);
+  useEffect(() => {
+    onVideoReadyRef.current = onVideoReady;
+  }, [onVideoReady]);
+
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -43,7 +49,7 @@ export function CompactCamera({
         videoRef.current.onloadedmetadata = () => {
           if (videoRef.current) {
             videoRef.current.play();
-            onVideoReady(videoRef.current);
+            onVideoReadyRef.current(videoRef.current);
           }
         };
       }
@@ -51,7 +57,7 @@ export function CompactCamera({
       console.error('Camera access denied:', err);
       setHasPermission(false);
     }
-  }, [onVideoReady]);
+  }, []);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
