@@ -1,8 +1,8 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Hands, Results } from '@mediapipe/hands';
+import { Results } from '@mediapipe/hands';
 import { supabase } from '@/integrations/supabase/client';
+import { useSharedHands } from './useSharedHands';
 
-const MEDIAPIPE_HANDS_VERSION = '0.4.1675469240';
 const CAPTURE_INTERVAL_MS = 10_000; // 10 seconds
 
 export interface PredictionResult {
@@ -21,7 +21,6 @@ export interface UseAIRecognitionReturn {
 }
 
 export function useAIRecognition(): UseAIRecognitionReturn {
-  const [isLoading, setIsLoading] = useState(false);
   const [isRunning, setIsRunning] = useState(false);
   const [prediction, setPrediction] = useState<PredictionResult | null>(null);
   const [handDetected, setHandDetected] = useState(false);
@@ -29,17 +28,21 @@ export function useAIRecognition(): UseAIRecognitionReturn {
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
-  const handsRef = useRef<Hands | null>(null);
   const intervalRef = useRef<number | null>(null);
   const lastLandmarksRef = useRef<{ x: number; y: number }[] | null>(null);
   const isRunningRef = useRef(false);
+  const animationFrameRef = useRef<number | null>(null);
 
   // Prevent overlapping calls
   const inFlightRef = useRef(false);
   const cooldownUntilRef = useRef<number>(0);
 
+  const { isLoading, isReady, error: handsError, sendFrame, registerCallback } = useSharedHands();
+
   // Handle MediaPipe results - store landmarks for cropping
   const handleResults = useCallback((results: Results) => {
+    if (!isRunningRef.current) return;
+
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
       setHandDetected(true);
       lastLandmarksRef.current = results.multiHandLandmarks[0];
@@ -49,51 +52,59 @@ export function useAIRecognition(): UseAIRecognitionReturn {
     }
   }, []);
 
+  // Register callback when running
+  useEffect(() => {
+    if (!isRunning) return;
+    return registerCallback(handleResults);
+  }, [isRunning, registerCallback, handleResults]);
+
   // Crop hand region from video based on landmarks
-  const cropHandRegion = useCallback((
-    video: HTMLVideoElement,
-    landmarks: { x: number; y: number }[],
-    canvas: HTMLCanvasElement
-  ): string | null => {
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return null;
+  const cropHandRegion = useCallback(
+    (video: HTMLVideoElement, landmarks: { x: number; y: number }[], canvas: HTMLCanvasElement): string | null => {
+      const ctx = canvas.getContext('2d');
+      if (!ctx) return null;
 
-    const videoWidth = video.videoWidth || 640;
-    const videoHeight = video.videoHeight || 480;
+      const videoWidth = video.videoWidth || 640;
+      const videoHeight = video.videoHeight || 480;
 
-    // Find bounding box from landmarks (normalized 0-1)
-    let minX = 1, minY = 1, maxX = 0, maxY = 0;
-    for (const lm of landmarks) {
-      minX = Math.min(minX, lm.x);
-      minY = Math.min(minY, lm.y);
-      maxX = Math.max(maxX, lm.x);
-      maxY = Math.max(maxY, lm.y);
-    }
+      // Find bounding box from landmarks (normalized 0-1)
+      let minX = 1,
+        minY = 1,
+        maxX = 0,
+        maxY = 0;
+      for (const lm of landmarks) {
+        minX = Math.min(minX, lm.x);
+        minY = Math.min(minY, lm.y);
+        maxX = Math.max(maxX, lm.x);
+        maxY = Math.max(maxY, lm.y);
+      }
 
-    // Add padding (20% on each side)
-    const padding = 0.2;
-    const width = maxX - minX;
-    const height = maxY - minY;
-    minX = Math.max(0, minX - width * padding);
-    minY = Math.max(0, minY - height * padding);
-    maxX = Math.min(1, maxX + width * padding);
-    maxY = Math.min(1, maxY + height * padding);
+      // Add padding (20% on each side)
+      const padding = 0.2;
+      const width = maxX - minX;
+      const height = maxY - minY;
+      minX = Math.max(0, minX - width * padding);
+      minY = Math.max(0, minY - height * padding);
+      maxX = Math.min(1, maxX + width * padding);
+      maxY = Math.min(1, maxY + height * padding);
 
-    // Convert to pixel coordinates
-    const sx = Math.floor(minX * videoWidth);
-    const sy = Math.floor(minY * videoHeight);
-    const sw = Math.floor((maxX - minX) * videoWidth);
-    const sh = Math.floor((maxY - minY) * videoHeight);
+      // Convert to pixel coordinates
+      const sx = Math.floor(minX * videoWidth);
+      const sy = Math.floor(minY * videoHeight);
+      const sw = Math.floor((maxX - minX) * videoWidth);
+      const sh = Math.floor((maxY - minY) * videoHeight);
 
-    if (sw < 10 || sh < 10) return null;
+      if (sw < 10 || sh < 10) return null;
 
-    // Draw cropped region to canvas (resize to 224x224 for model)
-    canvas.width = 224;
-    canvas.height = 224;
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, 224, 224);
+      // Draw cropped region to canvas (resize to 224x224 for model)
+      canvas.width = 224;
+      canvas.height = 224;
+      ctx.drawImage(video, sx, sy, sw, sh, 0, 0, 224, 224);
 
-    return canvas.toDataURL('image/jpeg', 0.8);
-  }, []);
+      return canvas.toDataURL('image/jpeg', 0.8);
+    },
+    []
+  );
 
   // Capture and predict when hand is detected
   const captureAndPredict = useCallback(async () => {
@@ -101,7 +112,6 @@ export function useAIRecognition(): UseAIRecognitionReturn {
 
     // Check if hand is detected and we have landmarks
     if (!lastLandmarksRef.current) {
-      // No hand detected, skip this capture
       return;
     }
 
@@ -161,91 +171,66 @@ export function useAIRecognition(): UseAIRecognitionReturn {
     }
   }, [cropHandRegion]);
 
-  // Process frames for hand detection (runs continuously)
+  // Frame processing loop (for sending frames to shared MediaPipe)
   const processFrame = useCallback(async () => {
-    if (!videoRef.current || !handsRef.current || !isRunningRef.current) return;
+    if (!videoRef.current || !isRunningRef.current || !isReady) return;
 
-    try {
-      await handsRef.current.send({ image: videoRef.current });
-    } catch (err) {
-      console.error('MediaPipe error:', err);
-    }
+    await sendFrame(videoRef.current);
 
     if (isRunningRef.current) {
-      requestAnimationFrame(processFrame);
+      animationFrameRef.current = requestAnimationFrame(processFrame);
     }
-  }, []);
+  }, [isReady, sendFrame]);
 
-  const startRecognition = useCallback(async (videoElement: HTMLVideoElement) => {
-    if (handsRef.current) {
-      // Already initialized, just restart
+  const startRecognition = useCallback(
+    (videoElement: HTMLVideoElement) => {
       videoRef.current = videoElement;
-      isRunningRef.current = true;
-      setIsRunning(true);
-      setError(null);
+      canvasRef.current = document.createElement('canvas');
+      setError(handsError);
 
-      // Restart frame processing
-      requestAnimationFrame(processFrame);
+      if (!isReady) {
+        return;
+      }
 
-      // Restart capture interval
-      if (intervalRef.current) clearInterval(intervalRef.current);
-      intervalRef.current = window.setInterval(captureAndPredict, CAPTURE_INTERVAL_MS);
-      return;
-    }
-
-    setIsLoading(true);
-    setError(null);
-    videoRef.current = videoElement;
-    canvasRef.current = document.createElement('canvas');
-
-    try {
-      // Initialize MediaPipe Hands for hand detection
-      const hands = new Hands({
-        locateFile: (file) => {
-          return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${MEDIAPIPE_HANDS_VERSION}/${file}`;
-        },
-      });
-
-      hands.setOptions({
-        maxNumHands: 1,
-        modelComplexity: 0, // Use lighter model for detection only
-        minDetectionConfidence: 0.6,
-        minTrackingConfidence: 0.5,
-      });
-
-      hands.onResults(handleResults);
-
-      await hands.initialize();
-      handsRef.current = hands;
-
-      setIsLoading(false);
       isRunningRef.current = true;
       setIsRunning(true);
 
-      // Start continuous hand detection
-      requestAnimationFrame(processFrame);
+      // Start frame processing
+      if (!animationFrameRef.current) {
+        animationFrameRef.current = requestAnimationFrame(processFrame);
+      }
 
       // Start capture interval (every 10 seconds)
+      if (intervalRef.current) clearInterval(intervalRef.current);
       intervalRef.current = window.setInterval(captureAndPredict, CAPTURE_INTERVAL_MS);
-    } catch (err) {
-      console.error('Failed to initialize:', err);
-      setError('Failed to initialize hand detection');
-      setIsLoading(false);
+    },
+    [isReady, handsError, processFrame, captureAndPredict]
+  );
+
+  // Start processing once ready
+  useEffect(() => {
+    if (isReady && videoRef.current && isRunningRef.current) {
+      if (!animationFrameRef.current) {
+        animationFrameRef.current = requestAnimationFrame(processFrame);
+      }
+      if (!intervalRef.current) {
+        intervalRef.current = window.setInterval(captureAndPredict, CAPTURE_INTERVAL_MS);
+      }
     }
-  }, [handleResults, processFrame, captureAndPredict]);
+  }, [isReady, processFrame, captureAndPredict]);
 
   const stopRecognition = useCallback(() => {
     isRunningRef.current = false;
     setIsRunning(false);
 
+    if (animationFrameRef.current) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
       intervalRef.current = null;
-    }
-
-    if (handsRef.current) {
-      handsRef.current.close();
-      handsRef.current = null;
     }
 
     setPrediction(null);
@@ -256,9 +241,15 @@ export function useAIRecognition(): UseAIRecognitionReturn {
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      stopRecognition();
+      isRunningRef.current = false;
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+      }
     };
-  }, [stopRecognition]);
+  }, []);
 
   return {
     isLoading,
@@ -267,6 +258,6 @@ export function useAIRecognition(): UseAIRecognitionReturn {
     handDetected,
     startRecognition,
     stopRecognition,
-    error,
+    error: error || handsError,
   };
 }
