@@ -8,30 +8,44 @@ import { useAIRecognition } from '@/hooks/useAIRecognition';
 
 const Index = () => {
   const [isActive, setIsActive] = useState(false);
-  
+
   // Tracking-based recognition (MediaPipe + Fingerpose)
-  const tracking = useASLRecognition();
-  
+  const {
+    startRecognition: startTracking,
+    stopRecognition: stopTracking,
+    ...tracking
+  } = useASLRecognition();
+
   // AI model-based recognition (Backend API)
-  const ai = useAIRecognition();
+  const {
+    startRecognition: startAI,
+    stopRecognition: stopAI,
+    ...ai
+  } = useAIRecognition();
 
-  const handleTrackingVideoReady = useCallback((video: HTMLVideoElement) => {
-    tracking.startRecognition(video);
-  }, [tracking]);
+  const handleTrackingVideoReady = useCallback(
+    (video: HTMLVideoElement) => {
+      startTracking(video);
+    },
+    [startTracking]
+  );
 
-  const handleAIVideoReady = useCallback((video: HTMLVideoElement) => {
-    ai.startRecognition(video);
-  }, [ai]);
+  const handleAIVideoReady = useCallback(
+    (video: HTMLVideoElement) => {
+      startAI(video);
+    },
+    [startAI]
+  );
 
   const handleToggle = useCallback(() => {
     if (isActive) {
-      tracking.stopRecognition();
-      ai.stopRecognition();
+      stopTracking();
+      stopAI();
       setIsActive(false);
     } else {
       setIsActive(true);
     }
-  }, [isActive, tracking, ai]);
+  }, [isActive, stopTracking, stopAI]);
 
   return (
     <div className="min-h-screen bg-background p-4 md:p-8">

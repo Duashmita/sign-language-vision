@@ -17,6 +17,12 @@ export function Camera({ onVideoReady, isActive, onToggle, landmarks, handDetect
   const [hasPermission, setHasPermission] = useState<boolean | null>(null);
   const [facingMode, setFacingMode] = useState<'user' | 'environment'>('user');
 
+  // Keep callback stable so camera doesn't restart on every render
+  const onVideoReadyRef = useRef(onVideoReady);
+  useEffect(() => {
+    onVideoReadyRef.current = onVideoReady;
+  }, [onVideoReady]);
+
   const startCamera = useCallback(async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -36,7 +42,7 @@ export function Camera({ onVideoReady, isActive, onToggle, landmarks, handDetect
         videoRef.current.onloadedmetadata = () => {
           if (videoRef.current) {
             videoRef.current.play();
-            onVideoReady(videoRef.current);
+            onVideoReadyRef.current(videoRef.current);
           }
         };
       }
@@ -44,7 +50,7 @@ export function Camera({ onVideoReady, isActive, onToggle, landmarks, handDetect
       console.error('Camera access denied:', err);
       setHasPermission(false);
     }
-  }, [facingMode, onVideoReady]);
+  }, [facingMode]);
 
   const stopCamera = useCallback(() => {
     if (streamRef.current) {
