@@ -110,11 +110,13 @@ const Index = () => {
               onVideoReady={handleAIVideoReady}
               isActive={isActive}
               onToggle={handleToggle}
+              handDetected={ai.handDetected}
+              showLandmarks={false}
             />
             <CompactPrediction
               prediction={ai.prediction}
               isLoading={ai.isLoading}
-              label="Prediction"
+              label="Prediction (every 10s)"
             />
           </div>
         </div>
