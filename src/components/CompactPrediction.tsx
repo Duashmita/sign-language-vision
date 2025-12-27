@@ -14,7 +14,7 @@ export function CompactPrediction({ prediction, isLoading, label }: CompactPredi
   };
 
   return (
-    <div className="flex items-center justify-between p-4 bg-card rounded-2xl border border-border card-soft transition-all duration-200 hover:card-elevated">
+    <div className="flex items-center justify-between p-4 bg-card rounded-2xl border border-border shadow-sm transition-all duration-200 hover:shadow-md">
       <span className="text-xs text-muted-foreground uppercase tracking-wider font-medium">{label}</span>
       
       {isLoading ? (

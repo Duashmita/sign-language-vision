@@ -48,7 +48,7 @@ const Index = () => {
   }, [isActive, stopTracking, stopAI]);
 
   return (
-    <div className="min-h-screen hero-gradient">
+    <div className="min-h-screen bg-gradient-to-br from-secondary to-primary/5">
       {/* Decorative elements */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-20 left-10 w-64 h-64 bg-primary/5 rounded-full blur-3xl" />
@@ -58,8 +58,8 @@ const Index = () => {
       <div className="relative max-w-4xl mx-auto p-6 md:p-10 space-y-8">
         {/* Header */}
         <header className="text-center space-y-4">
-          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border card-soft">
-            <Hand className="w-4 h-4 text-primary animate-float" />
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-card border border-border shadow-sm">
+            <Hand className="w-4 h-4 text-primary" />
             <span className="text-sm font-semibold text-foreground">ASL Recognition</span>
           </div>
           <h1 className="text-3xl md:text-4xl font-bold text-foreground tracking-tight">
@@ -93,7 +93,7 @@ const Index = () => {
 
         {/* Shared Camera */}
         <div className="max-w-lg mx-auto">
-          <div className="bg-card rounded-3xl p-3 card-elevated border border-border">
+          <div className="bg-card rounded-3xl p-3 shadow-lg border border-border">
             <CompactCamera
               onVideoReady={handleVideoReady}
               isActive={isActive}
@@ -158,12 +158,12 @@ const Index = () => {
 
         {/* Info Cards */}
         <div className="grid md:grid-cols-2 gap-4 text-center">
-          <div className="p-4 rounded-2xl bg-card border border-border card-soft">
+          <div className="p-4 rounded-2xl bg-card border border-border shadow-sm">
             <p className="text-xs text-muted-foreground">
               <span className="font-medium text-accent">Left:</span> Instant local hand tracking with gesture recognition
             </p>
           </div>
-          <div className="p-4 rounded-2xl bg-card border border-border card-soft">
+          <div className="p-4 rounded-2xl bg-card border border-border shadow-sm">
             <p className="text-xs text-muted-foreground">
               <span className="font-medium text-primary">Right:</span> CNN prediction every 10s when hand detected
             </p>
