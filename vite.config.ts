@@ -5,6 +5,9 @@ import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => ({
+  // For GitHub Pages: set base to repo name (update 'asl-recognition' to your repo name)
+  // For root domain or custom domain, use '/'
+  base: mode === "production" ? "/asl-recognition/" : "/",
   server: {
     host: "::",
     port: 8080,
