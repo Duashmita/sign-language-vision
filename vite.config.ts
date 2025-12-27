@@ -4,18 +4,25 @@ import path from "path";
 import { componentTagger } from "lovable-tagger";
 
 // https://vitejs.dev/config/
-export default defineConfig(({ mode }) => ({
-  // For GitHub Pages: set base to repo name (update 'asl-recognition' to your repo name)
-  // For root domain or custom domain, use '/'
-  base: mode === "production" ? "/asl-recognition/" : "/",
-  server: {
-    host: "::",
-    port: 8080,
-  },
-  plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+export default defineConfig(({ mode }) => {
+  // GitHub Pages sets GITHUB_REPOSITORY=owner/repo in Actions.
+  // This makes the build work automatically for any repo name without hardcoding.
+  const repo = process.env.GITHUB_REPOSITORY?.split("/")?.[1];
+  const base =
+    mode === "production" ? (repo ? `/${repo}/` : "/") : "/";
+
+  return {
+    base,
+    server: {
+      host: "::",
+      port: 8080,
     },
-  },
-}));
+    plugins: [react(), mode === "development" && componentTagger()].filter(Boolean),
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
+    },
+  };
+});
+
