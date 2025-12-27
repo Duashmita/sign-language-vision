@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef, useEffect } from 'react';
 import { Hand, Play, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { CompactCamera } from '@/components/CompactCamera';
@@ -8,6 +8,7 @@ import { useAIRecognition } from '@/hooks/useAIRecognition';
 
 const Index = () => {
   const [isActive, setIsActive] = useState(false);
+  const sharedVideoRef = useRef<HTMLVideoElement | null>(null);
 
   // Tracking-based recognition (MediaPipe + Fingerpose)
   const {
@@ -23,18 +24,14 @@ const Index = () => {
     ...ai
   } = useAIRecognition();
 
-  const handleTrackingVideoReady = useCallback(
+  // When video is ready, start both recognition methods with the SAME video
+  const handleVideoReady = useCallback(
     (video: HTMLVideoElement) => {
+      sharedVideoRef.current = video;
       startTracking(video);
-    },
-    [startTracking]
-  );
-
-  const handleAIVideoReady = useCallback(
-    (video: HTMLVideoElement) => {
       startAI(video);
     },
-    [startAI]
+    [startTracking, startAI]
   );
 
   const handleToggle = useCallback(() => {
@@ -73,10 +70,22 @@ const Index = () => {
             ) : (
               <>
                 <Play className="w-4 h-4" />
-                Start Cameras
+                Start Camera
               </>
             )}
           </Button>
+        </div>
+
+        {/* Shared Camera */}
+        <div className="max-w-md mx-auto">
+          <CompactCamera
+            onVideoReady={handleVideoReady}
+            isActive={isActive}
+            onToggle={handleToggle}
+            landmarks={tracking.landmarks}
+            handDetected={tracking.handDetected || ai.handDetected}
+            showLandmarks={true}
+          />
         </div>
 
         {/* Comparison Grid */}
@@ -84,16 +93,8 @@ const Index = () => {
           {/* Tracking Method */}
           <div className="space-y-3">
             <h2 className="text-sm font-medium text-center text-muted-foreground">
-              MediaPipe + Fingerpose
+              MediaPipe + Fingerpose (Real-time)
             </h2>
-            <CompactCamera
-              onVideoReady={handleTrackingVideoReady}
-              isActive={isActive}
-              onToggle={handleToggle}
-              landmarks={tracking.landmarks}
-              handDetected={tracking.handDetected}
-              showLandmarks={true}
-            />
             <CompactPrediction
               prediction={tracking.prediction}
               isLoading={tracking.isLoading}
@@ -104,19 +105,12 @@ const Index = () => {
           {/* AI Model Method */}
           <div className="space-y-3">
             <h2 className="text-sm font-medium text-center text-muted-foreground">
-              AI Model (Backend)
+              AI Model (Every 10s when hand detected)
             </h2>
-            <CompactCamera
-              onVideoReady={handleAIVideoReady}
-              isActive={isActive}
-              onToggle={handleToggle}
-              handDetected={ai.handDetected}
-              showLandmarks={false}
-            />
             <CompactPrediction
               prediction={ai.prediction}
               isLoading={ai.isLoading}
-              label="Prediction (every 10s)"
+              label="Prediction"
             />
           </div>
         </div>
@@ -130,8 +124,8 @@ const Index = () => {
 
         {/* Info */}
         <div className="text-center text-xs text-muted-foreground space-y-1">
-          <p>Left: Local hand tracking with gesture recognition</p>
-          <p>Right: Backend AI model (requires API setup)</p>
+          <p>Left: Local hand tracking with gesture recognition (instant)</p>
+          <p>Right: Backend AI model prediction (captures every 10s when hand is visible)</p>
         </div>
       </div>
     </div>

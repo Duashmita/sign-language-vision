@@ -31,13 +31,12 @@ export function useAIRecognition(): UseAIRecognitionReturn {
   const intervalRef = useRef<number | null>(null);
   const lastLandmarksRef = useRef<{ x: number; y: number }[] | null>(null);
   const isRunningRef = useRef(false);
-  const animationFrameRef = useRef<number | null>(null);
 
   // Prevent overlapping calls
   const inFlightRef = useRef(false);
   const cooldownUntilRef = useRef<number>(0);
 
-  const { isLoading, isReady, error: handsError, sendFrame, registerCallback } = useSharedHands();
+  const { isLoading, isReady, error: handsError, registerCallback } = useSharedHands();
 
   // Handle MediaPipe results - store landmarks for cropping
   const handleResults = useCallback((results: Results) => {
@@ -112,21 +111,33 @@ export function useAIRecognition(): UseAIRecognitionReturn {
 
     // Check if hand is detected and we have landmarks
     if (!lastLandmarksRef.current) {
+      console.log('AI: No hand detected, skipping capture');
       return;
     }
 
     // Avoid piling up requests
-    if (inFlightRef.current) return;
-    if (Date.now() < cooldownUntilRef.current) return;
+    if (inFlightRef.current) {
+      console.log('AI: Request in flight, skipping');
+      return;
+    }
+    if (Date.now() < cooldownUntilRef.current) {
+      console.log('AI: In cooldown, skipping');
+      return;
+    }
 
     const video = videoRef.current;
     const canvas = canvasRef.current;
 
     // Crop hand region
     const imageData = cropHandRegion(video, lastLandmarksRef.current, canvas);
-    if (!imageData) return;
+    if (!imageData) {
+      console.log('AI: Failed to crop hand region');
+      return;
+    }
 
+    console.log('AI: Sending cropped hand image to model...');
     inFlightRef.current = true;
+    
     try {
       const { data, error: fnError } = await supabase.functions.invoke('predict-asl', {
         body: { imageData },
@@ -147,6 +158,7 @@ export function useAIRecognition(): UseAIRecognitionReturn {
       }
 
       setError(null);
+      console.log('AI: Got prediction response:', data);
 
       // Handle response format
       if (data?.letter) {
@@ -171,62 +183,30 @@ export function useAIRecognition(): UseAIRecognitionReturn {
     }
   }, [cropHandRegion]);
 
-  // Frame processing loop (for sending frames to shared MediaPipe)
-  const processFrame = useCallback(async () => {
-    if (!videoRef.current || !isRunningRef.current || !isReady) return;
-
-    await sendFrame(videoRef.current);
-
-    if (isRunningRef.current) {
-      animationFrameRef.current = requestAnimationFrame(processFrame);
-    }
-  }, [isReady, sendFrame]);
-
   const startRecognition = useCallback(
     (videoElement: HTMLVideoElement) => {
+      console.log('AI: Starting recognition');
       videoRef.current = videoElement;
       canvasRef.current = document.createElement('canvas');
       setError(handsError);
 
-      if (!isReady) {
-        return;
-      }
-
       isRunningRef.current = true;
       setIsRunning(true);
-
-      // Start frame processing
-      if (!animationFrameRef.current) {
-        animationFrameRef.current = requestAnimationFrame(processFrame);
-      }
 
       // Start capture interval (every 10 seconds)
       if (intervalRef.current) clearInterval(intervalRef.current);
       intervalRef.current = window.setInterval(captureAndPredict, CAPTURE_INTERVAL_MS);
+      
+      // Also do an immediate capture after a short delay
+      setTimeout(captureAndPredict, 2000);
     },
-    [isReady, handsError, processFrame, captureAndPredict]
+    [handsError, captureAndPredict]
   );
 
-  // Start processing once ready
-  useEffect(() => {
-    if (isReady && videoRef.current && isRunningRef.current) {
-      if (!animationFrameRef.current) {
-        animationFrameRef.current = requestAnimationFrame(processFrame);
-      }
-      if (!intervalRef.current) {
-        intervalRef.current = window.setInterval(captureAndPredict, CAPTURE_INTERVAL_MS);
-      }
-    }
-  }, [isReady, processFrame, captureAndPredict]);
-
   const stopRecognition = useCallback(() => {
+    console.log('AI: Stopping recognition');
     isRunningRef.current = false;
     setIsRunning(false);
-
-    if (animationFrameRef.current) {
-      cancelAnimationFrame(animationFrameRef.current);
-      animationFrameRef.current = null;
-    }
 
     if (intervalRef.current) {
       clearInterval(intervalRef.current);
@@ -242,9 +222,6 @@ export function useAIRecognition(): UseAIRecognitionReturn {
   useEffect(() => {
     return () => {
       isRunningRef.current = false;
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
       if (intervalRef.current) {
         clearInterval(intervalRef.current);
       }
