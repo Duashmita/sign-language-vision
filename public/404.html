@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASL Recognition</title>
+  <script>
+    // Single Page App redirect for GitHub Pages
+    // Redirects all 404s back to index.html with the path as a query param
+    const path = window.location.pathname;
+    const search = window.location.search;
+    const hash = window.location.hash;
+    
+    // Redirect to index with the original path stored in sessionStorage
+    sessionStorage.setItem('redirect', path + search + hash);
+    window.location.replace('/asl-recognition/');
+  </script>
+</head>
+<body>
+  <p>Redirecting...</p>
+</body>
+</html>
