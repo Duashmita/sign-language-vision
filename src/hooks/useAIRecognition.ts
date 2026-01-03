@@ -1,7 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Results } from '@mediapipe/hands';
 import { supabase } from '@/integrations/supabase/client';
-import { useSharedHands } from './useSharedHands';
+import { useSharedHands, HandsResults } from './useSharedHands';
 
 const CAPTURE_INTERVAL_MS = 10_000; // 10 seconds
 
@@ -39,7 +38,7 @@ export function useAIRecognition(): UseAIRecognitionReturn {
   const { isLoading, isReady, error: handsError, registerCallback } = useSharedHands();
 
   // Handle MediaPipe results - store landmarks for cropping
-  const handleResults = useCallback((results: Results) => {
+  const handleResults = useCallback((results: HandsResults) => {
     if (!isRunningRef.current) return;
 
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
