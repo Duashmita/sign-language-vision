@@ -1,8 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Results } from '@mediapipe/hands';
 import { GestureEstimator } from 'fingerpose';
 import { aslGestures } from '@/lib/aslGestures';
-import { useSharedHands } from './useSharedHands';
+import { useSharedHands, HandsResults } from './useSharedHands';
 
 export interface PredictionResult {
   letter: string;
@@ -40,7 +39,7 @@ export function useASLRecognition(): UseASLRecognitionReturn {
   }, []);
 
   // Handle MediaPipe results
-  const handleResults = useCallback((results: Results) => {
+  const handleResults = useCallback((results: HandsResults) => {
     if (!isRunningRef.current) return;
 
     if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {

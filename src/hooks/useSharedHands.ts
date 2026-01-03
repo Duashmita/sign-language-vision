@@ -1,12 +1,31 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
-import { Hands, Results } from '@mediapipe/hands';
+import { useEffect, useState, useCallback } from 'react';
 
 const MEDIAPIPE_HANDS_VERSION = '0.4.1675469240';
 
-type ResultsCallback = (results: Results) => void;
+// MediaPipe types (since we're loading dynamically)
+interface HandLandmark {
+  x: number;
+  y: number;
+  z: number;
+}
+
+export interface HandsResults {
+  multiHandLandmarks: HandLandmark[][];
+  multiHandedness: { label: string; score: number }[];
+  image: HTMLCanvasElement | HTMLVideoElement;
+}
+
+export type ResultsCallback = (results: HandsResults) => void;
+
+interface MediaPipeHands {
+  setOptions: (options: Record<string, unknown>) => void;
+  onResults: (callback: (results: HandsResults) => void) => void;
+  initialize: () => Promise<void>;
+  send: (input: { image: HTMLVideoElement }) => Promise<void>;
+}
 
 interface SharedHandsState {
-  hands: Hands | null;
+  hands: MediaPipeHands | null;
   isInitializing: boolean;
   isInitialized: boolean;
   error: string | null;
@@ -22,9 +41,39 @@ const sharedState: SharedHandsState = {
   callbacks: new Set(),
 };
 
-let initPromise: Promise<Hands | null> | null = null;
+let initPromise: Promise<MediaPipeHands | null> | null = null;
 
-async function initializeHands(): Promise<Hands | null> {
+// Type for the global Hands constructor
+type HandsConstructor = new (config: { locateFile: (file: string) => string }) => MediaPipeHands;
+
+// Dynamically load MediaPipe Hands from CDN
+async function loadMediaPipeHands(): Promise<HandsConstructor> {
+  const cdnUrl = `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${MEDIAPIPE_HANDS_VERSION}/hands.js`;
+  
+  // Check if already loaded
+  const win = window as Window & { Hands?: HandsConstructor };
+  if (win.Hands) {
+    return win.Hands;
+  }
+
+  return new Promise((resolve, reject) => {
+    const script = document.createElement('script');
+    script.src = cdnUrl;
+    script.crossOrigin = 'anonymous';
+    script.onload = () => {
+      const HandsClass = (window as Window & { Hands?: HandsConstructor }).Hands;
+      if (HandsClass) {
+        resolve(HandsClass);
+      } else {
+        reject(new Error('MediaPipe Hands not found on window after loading'));
+      }
+    };
+    script.onerror = () => reject(new Error('Failed to load MediaPipe Hands script'));
+    document.head.appendChild(script);
+  });
+}
+
+async function initializeHands(): Promise<MediaPipeHands | null> {
   if (sharedState.hands) return sharedState.hands;
   if (sharedState.isInitializing && initPromise) return initPromise;
 
@@ -32,7 +81,9 @@ async function initializeHands(): Promise<Hands | null> {
 
   initPromise = (async () => {
     try {
-      const hands = new Hands({
+      const HandsClass = await loadMediaPipeHands();
+      
+      const hands = new HandsClass({
         locateFile: (file) => {
           return `https://cdn.jsdelivr.net/npm/@mediapipe/hands@${MEDIAPIPE_HANDS_VERSION}/${file}`;
         },
